@@ -27,7 +27,7 @@ def render(content_path):
         br = p.chromium.launch(args=["--font-render-hinting=none", "--disable-lcd-text"])
         pg = br.new_page(viewport={"width": 1080, "height": 1350}, device_scale_factor=SCALE)
         for i, s in enumerate(slides, 1):
-            html = frame(build(s), doc["slot"], i, total)
+            html = frame(build(s), doc["slot"], i, total, variant=doc.get("variant", ""))
             f = tmp / ("%02d.html" % i)
             f.write_text(html, encoding="utf-8")
             pg.goto(f.as_uri())
