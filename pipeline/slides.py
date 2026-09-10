@@ -9,10 +9,10 @@ def _rich(s):
             .replace("&lt;br&gt;", "<br>")
             .replace("&#x27;", "'"))
 
-def _eyebrow(t, plain=False):
+def _eyebrow(t, plain=False, amber=False):
     if not t:
         return ""
-    cls = "eyebrow plain" if plain else "eyebrow"
+    cls = "eyebrow amber" if amber else ("eyebrow plain" if plain else "eyebrow")
     return '<div class="%s">%s</div>' % (cls, _rich(t))
 
 def _note(n):
@@ -111,7 +111,25 @@ def outro(s):
             '<div class="gap-s"></div>' +
             '<div class="disc">%s</div>' % _rich(s.get("disclaimer", "")))
 
-BUILDERS = {"cover": cover, "indices": indices, "point": point,
+def talk(s):
+    boxes = ""
+    for i, qt in enumerate(s.get("quotes", [])):
+        if i:
+            boxes += '<div class="gap-s"></div>'
+        boxes += ('<div class="talk"><div class="talk-t">%s</div>'
+                  '<div class="talk-s">%s</div></div>'
+                  ) % (_rich(qt["text"]), _rich(qt.get("source", "")))
+    warn = s.get("warning", "확인된 사실이 아니라 조건이 붙은 전망입니다.")
+    return (_eyebrow(s.get("eyebrow", "시장의 말"), amber=True) +
+            '<h2>%s</h2>' % _rich(s["title"]) +
+            '<div class="gap-m"></div>' +
+            '<div class="lead">%s</div>' % _rich(s.get("lead", "")) +
+            '<div class="gap-l"></div>' + boxes +
+            '<div class="sp"></div>' +
+            '<div class="warn"><div class="warn-i">!</div>'
+            '<div class="warn-t">%s</div></div>' % _rich(warn))
+
+BUILDERS = {"cover": cover, "talk": talk, "indices": indices, "point": point,
             "bignum": bignum, "checklist": checklist, "outro": outro}
 
 def build(s):
