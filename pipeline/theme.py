@@ -30,15 +30,98 @@ body {
    background:radial-gradient(115% 88% at 50% 42%, transparent 40%, rgba(0,0,0,.62) 100%); }
 
 /* ── 회차별 배경 (피드에 리듬을 만든다) ── */
+/* 점심: 밝은 배경 + 어두운 텍스트 */
 .v-noon .bg { background:
-   radial-gradient(120% 80% at 84% -6%, rgba(200,250,60,.15) 0%, rgba(200,250,60,0) 50%),
-   radial-gradient(112% 78% at 6% 10%, rgba(20,140,130,.34) 0%, rgba(20,140,130,0) 60%),
-   linear-gradient(166deg, #08211F 0%, #061512 48%, #030B0A 100%); }
-.v-noon .grid { background-size:70px 70px; }
+   radial-gradient(120% 74% at 86% -8%, rgba(200,250,60,.42) 0%, rgba(200,250,60,0) 46%),
+   radial-gradient(108% 70% at 4% 4%, rgba(255,214,150,.34) 0%, rgba(255,214,150,0) 52%),
+   linear-gradient(166deg, #FBF9F4 0%, #F4F1E9 52%, #EBE7DC 100%); }
+.v-noon .grid { background-size:74px 74px; opacity:.85;
+   background-image:linear-gradient(rgba(20,26,38,.045) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(20,26,38,.045) 1px, transparent 1px); }
+.v-noon .vig { background:radial-gradient(118% 86% at 50% 40%, transparent 52%, rgba(120,110,88,.14) 100%); }
+.v-noon .wm-tx { color:#141A26; }
+.v-noon .wm-dot { background:#8BB800; box-shadow:0 0 14px rgba(139,184,0,.5); }
+.v-noon .slot { color:#7A8090; }
+.v-noon .slot b { color:#4F7A00; }
+.v-noon .pg { color:#9AA0AC; }
+.v-noon .dot { background:rgba(20,26,38,.14); }
+.v-noon .dot.on { background:#8BB800; }
+.v-noon h1, .v-noon h2 { color:#101724; }
+.v-noon h1 em, .v-noon h2 em { color:#4F7A00; }
+.v-noon .lead { color:#5B6376; }
+.v-noon .lead b { color:#1B2230; }
+.v-noon .eyebrow { background:#C8FA3C; border-color:#A9DC1E; color:#1A2410; }
+.v-noon .eyebrow.plain { background:rgba(20,26,38,.06); border-color:rgba(20,26,38,.12); color:#5B6376; }
+.v-noon .eyebrow.amber { background:#FFD79A; border-color:#F0B95E; color:#4A2F00; }
+.v-noon .row, .v-noon .li, .v-noon .st, .v-noon .sc, .v-noon .note, .v-noon .src, .v-noon .warn {
+   background:#FFFFFF; border-color:rgba(20,26,38,.09);
+   box-shadow:0 2px 10px rgba(90,80,60,.05); }
+.v-noon .row.hero { background:linear-gradient(104deg, rgba(200,250,60,.30), rgba(200,250,60,.10));
+   border-color:#BCE95C; }
+.v-noon .sc.up { background:linear-gradient(150deg, rgba(217,45,32,.10), rgba(217,45,32,.02));
+   border-color:rgba(217,45,32,.28); }
+.v-noon .sc.dn { background:linear-gradient(150deg, rgba(29,100,216,.10), rgba(29,100,216,.02));
+   border-color:rgba(29,100,216,.28); }
+.v-noon .r-nm, .v-noon .r-vl, .v-noon .li-t, .v-noon .sc-v, .v-noon .big-n { color:#101724; }
+.v-noon .r-sub, .v-noon .li-s, .v-noon .sc-l, .v-noon .st-l, .v-noon .big-u { color:#78808F; }
+.v-noon .sc-s { color:#8A919E; }
+.v-noon .up { color:#C92A1D; } .v-noon .dn { color:#1A5FD0; } .v-noon .fl { color:#7A818E; }
+.v-noon .note { border-right-color:#8BB800; }
+.v-noon .note-t { color:#4F7A00; }
+.v-noon .note-b { color:#39424F; }
+.v-noon .note-b b { color:#101724; }
+.v-noon .st-v { color:#4F7A00; }
+.v-noon .li-d { background:rgba(139,184,0,.16); border-color:rgba(139,184,0,.4); color:#4F7A00; }
+.v-noon .cta { background:linear-gradient(126deg, rgba(200,250,60,.34), rgba(200,250,60,.12));
+   border-color:#BCE95C; }
+.v-noon .cta-t { color:#101724; }
+.v-noon .cta-s { color:#5B6376; }
+.v-noon .src-t { color:#78808F; }
+.v-noon .src-i { color:#8A919E; }
+.v-noon .disc { color:#9AA0AC; }
+.v-noon .talk { background:linear-gradient(126deg, rgba(255,184,77,.20), rgba(255,184,77,.06));
+   border-color:rgba(214,150,40,.38); border-left:none; border-right:3px solid #E09B25; }
+.v-noon .talk-t { color:#101724; }
+.v-noon .talk-s { color:#78808F; }
+.v-noon .warn-i { background:rgba(224,155,37,.16); border-color:rgba(224,155,37,.5); color:#B5760E; }
+.v-noon .warn-t { color:#78808F; }
 .v-evening .bg { background:
    radial-gradient(120% 80% at 18% -4%, rgba(200,250,60,.13) 0%, rgba(200,250,60,0) 48%),
    radial-gradient(115% 80% at 88% 8%, rgba(104,58,190,.36) 0%, rgba(104,58,190,0) 62%),
    linear-gradient(174deg, #150F2B 0%, #0C0819 50%, #05030C 100%); }
+
+/* ── 막대 그래프 ── */
+.chart { flex:1; min-height:0; display:flex; flex-direction:column;
+   justify-content:center; gap:16px; }
+.chart.roomy { gap:26px; }
+.chart.roomy .cb-track { height:62px; }
+.chart.roomy .cb-n { font-size:31px; }
+.chart.roomy .cb-n span { font-size:20px; }
+.chart.roomy .cb-v { font-size:35px; }
+.cbar { display:grid; grid-template-columns:236px 1fr 148px; align-items:center; gap:20px; }
+.cb-n { font-size:27px; font-weight:700; color:#DDE4EE; letter-spacing:-.015em;
+   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cb-n span { display:block; font-size:19px; font-weight:500; color:#79839A; margin-top:3px; }
+.cb-track { position:relative; height:46px; border-radius:13px;
+   background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.075); }
+.cb-zero { position:absolute; top:-4px; bottom:-4px; width:2px; border-radius:2px;
+   background:rgba(255,255,255,.18); }
+.cb-fill { position:absolute; top:7px; bottom:7px; border-radius:9px; min-width:5px; }
+.cb-fill.up { background:linear-gradient(90deg, rgba(217,45,32,.45), #E4463A); }
+.cb-fill.dn { background:linear-gradient(270deg, rgba(29,100,216,.45), #4187F0); }
+.cb-fill.fl { background:rgba(255,255,255,.22); }
+.cb-v { text-align:right; font-size:30px; font-weight:800; letter-spacing:-.02em;
+   font-variant-numeric:tabular-nums; }
+.cb-axis { display:flex; justify-content:space-between; font-size:18px; font-weight:600;
+   color:#5C6579; letter-spacing:.03em; padding:0 168px 0 256px; margin-top:6px; }
+.v-noon .cb-n { color:#101724; }
+.v-noon .cb-n span { color:#78808F; }
+.v-noon .cb-track { background:rgba(20,26,38,.05); border-color:rgba(20,26,38,.10); }
+.v-noon .cb-zero { background:rgba(20,26,38,.18); }
+.v-noon .cb-fill.up { background:linear-gradient(90deg, rgba(201,42,29,.42), #C92A1D); }
+.v-noon .cb-fill.dn { background:linear-gradient(270deg, rgba(26,95,208,.42), #1A5FD0); }
+.v-noon .cb-fill.fl { background:rgba(20,26,38,.2); }
+.v-noon .cb-axis { color:#9AA0AC; }
 
 /* ── 프레임 ── */
 .frame { position:absolute; inset:0; padding:76px; display:flex; flex-direction:column; }
