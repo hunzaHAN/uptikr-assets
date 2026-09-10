@@ -129,7 +129,53 @@ def talk(s):
             '<div class="warn"><div class="warn-i">!</div>'
             '<div class="warn-t">%s</div></div>' % _rich(warn))
 
-BUILDERS = {"cover": cover, "talk": talk, "indices": indices, "point": point,
+def chart(s):
+    """가로 막대 그래프. bars=[{name, sub, value(숫자), label}] 값은 %가 기본."""
+    bars = s.get("bars") or []
+    vals = []
+    for b in bars:
+        try:
+            vals.append(float(b["value"]))
+        except (KeyError, TypeError, ValueError):
+            vals.append(0.0)
+    span = max([abs(v) for v in vals] + [0.0001])
+    diverging = min(vals) < 0 < max(vals)
+    unit = s.get("unit", "%")
+
+    rows = ""
+    for b, v in zip(bars, vals):
+        d = "up" if v > 0 else ("dn" if v < 0 else "fl")
+        pct = abs(v) / span * (48.0 if diverging else 96.0)
+        if diverging:
+            side = "left:50%%; width:%.2f%%;" % pct if v >= 0 else "right:50%%; width:%.2f%%;" % pct
+        else:
+            side = ("right:2%%; width:%.2f%%;" % pct) if max(vals) <= 0 else ("left:2%%; width:%.2f%%;" % pct)
+        zero = '<div class="cb-zero" style="left:50%;"></div>' if diverging else ""
+        label = b.get("label")
+        if label is None:
+            label = ("%+.2f" % v).rstrip("0").rstrip(".") + unit
+        sub = ('<span>%s</span>' % _rich(b["sub"])) if b.get("sub") else ""
+        rows += ('<div class="cbar"><div class="cb-n">%s%s</div>'
+                 '<div class="cb-track">%s<div class="cb-fill %s" style="%s"></div></div>'
+                 '<div class="cb-v %s">%s</div></div>'
+                 ) % (_rich(b.get("name", "")), sub, zero, d, side, d, _rich(label))
+
+    axis = ""
+    if s.get("axis"):
+        a = s["axis"]
+        axis = ('<div class="cb-axis"><span>%s</span><span>%s</span></div>'
+                % (_rich(a.get("left", "")), _rich(a.get("right", ""))))
+
+    lead = ('<div class="lead">%s</div><div class="gap-m"></div>' % _rich(s["lead"])) if s.get("lead") else ""
+    roomy = " roomy" if len(bars) <= 4 else ""
+    return (_eyebrow(s.get("eyebrow"), plain=True) +
+            '<h2>%s</h2>' % _rich(s["title"]) +
+            '<div class="gap-m"></div>' + lead +
+            '<div class="chart%s">%s%s</div>' % (roomy, rows, axis) +
+            '<div class="gap-l"></div>' + _note(s.get("note")))
+
+BUILDERS = {"cover": cover, "talk": talk, "indices": indices,
+    "chart": chart, "point": point,
             "bignum": bignum, "checklist": checklist, "outro": outro}
 
 def build(s):
