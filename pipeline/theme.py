@@ -132,6 +132,22 @@ h1 em, h2 em { font-style:normal; color:#C8FA3C; }
 .cta-t { font-size:31px; font-weight:800; color:#fff; letter-spacing:-.022em; line-height:1.4; }
 .cta-s { font-size:22px; font-weight:500; color:#A6B0C0; margin-top:14px; line-height:1.56; }
 
+/* ── 시장의 말 (미확인 전망) ── */
+.eyebrow.amber { background:rgba(255,184,77,.13); border-color:rgba(255,184,77,.38); color:#FFB84D; }
+.talk { padding:32px 34px; border-radius:20px;
+   background:linear-gradient(126deg, rgba(255,184,77,.11), rgba(255,184,77,.025));
+   border:1px solid rgba(255,184,77,.30); border-left:3px solid #FFB84D; }
+.talk-t { font-size:30px; font-weight:700; color:#fff; line-height:1.5; letter-spacing:-.02em; }
+.talk-s { font-size:20px; font-weight:500; color:#95A0B0; margin-top:15px; line-height:1.5; }
+.warn { display:flex; align-items:flex-start; gap:14px;
+   padding:22px 26px; border-radius:16px; background:rgba(255,255,255,.04);
+   border:1px solid rgba(255,255,255,.09); }
+.warn-i { flex:none; width:28px; height:28px; border-radius:50%; margin-top:2px;
+   background:rgba(255,184,77,.18); border:1px solid rgba(255,184,77,.48);
+   display:flex; align-items:center; justify-content:center;
+   font-size:17px; font-weight:800; color:#FFB84D; }
+.warn-t { font-size:21px; font-weight:500; color:#8E98AA; line-height:1.55; letter-spacing:-.008em; }
+
 /* ── 출처 ── */
 .src { display:flex; flex-direction:column; gap:9px; padding:26px 28px; border-radius:18px;
    background:rgba(255,255,255,.032); border:1px solid rgba(255,255,255,.07); }
