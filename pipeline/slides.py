@@ -81,6 +81,7 @@ def bignum(s):
             '<div class="big-u">%s</div></div>' % (s.get("dir", ""), _rich(s["num"]), _rich(s.get("unit", ""))) +
             '<div class="gap-m"></div>' +
             '<div class="lead">%s</div>' % _rich(s.get("lead", "")) +
+            _stat(s.get("stat")) +
             '<div class="sp"></div>' + _note(s.get("note")))
 
 def checklist(s):
