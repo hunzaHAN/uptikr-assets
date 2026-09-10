@@ -29,6 +29,17 @@ body {
 .vig { position:absolute; inset:0;
    background:radial-gradient(115% 88% at 50% 42%, transparent 40%, rgba(0,0,0,.62) 100%); }
 
+/* ── 회차별 배경 (피드에 리듬을 만든다) ── */
+.v-noon .bg { background:
+   radial-gradient(120% 80% at 84% -6%, rgba(200,250,60,.15) 0%, rgba(200,250,60,0) 50%),
+   radial-gradient(112% 78% at 6% 10%, rgba(20,140,130,.34) 0%, rgba(20,140,130,0) 60%),
+   linear-gradient(166deg, #08211F 0%, #061512 48%, #030B0A 100%); }
+.v-noon .grid { background-size:70px 70px; }
+.v-evening .bg { background:
+   radial-gradient(120% 80% at 18% -4%, rgba(200,250,60,.13) 0%, rgba(200,250,60,0) 48%),
+   radial-gradient(115% 80% at 88% 8%, rgba(104,58,190,.36) 0%, rgba(104,58,190,0) 62%),
+   linear-gradient(174deg, #150F2B 0%, #0C0819 50%, #05030C 100%); }
+
 /* ── 프레임 ── */
 .frame { position:absolute; inset:0; padding:76px; display:flex; flex-direction:column; }
 .top { display:flex; align-items:center; justify-content:space-between; height:40px; flex:none; }
@@ -155,11 +166,26 @@ h1 em, h2 em { font-style:normal; color:#C8FA3C; }
 .src-i { font-size:19px; font-weight:500; color:#69738A; line-height:1.62; }
 .disc { font-size:18px; font-weight:500; color:#5A6377; line-height:1.6; letter-spacing:-.005em; }
 
+.v-noon .top { flex-direction:row-reverse; }
+.v-noon .bot { flex-direction:row-reverse; }
+.v-noon .eyebrow { align-self:flex-end; }
+.v-noon h1, .v-noon h2, .v-noon .lead { text-align:right; }
+.v-noon .big { justify-content:flex-end; }
+.v-noon .note { border-left:none; border-right:3px solid #C8FA3C; text-align:right; }
+.v-noon .row { flex-direction:row-reverse; }
+.v-noon .r-l { align-items:flex-end; }
+.v-noon .r-r { align-items:flex-start; }
+.v-noon .sc-l, .v-noon .sc-v, .v-noon .sc-s { text-align:right; }
+.v-noon .st { text-align:right; }
+.v-noon .li { flex-direction:row-reverse; text-align:right; }
+.v-noon .li-x { align-items:flex-end; }
+.v-noon .src, .v-noon .disc, .v-noon .cta { text-align:right; }
+
 .sp { flex:1; }
 .gap-s { height:22px; } .gap-m { height:34px; } .gap-l { height:48px; }
 """
 
-def frame(inner, slot_label, page, total, cover=False):
+def frame(inner, slot_label, page, total, cover=False, variant=""):
     dots = "".join(
         '<div class="dot%s"></div>' % (" on" if i == page - 1 else "")
         for i in range(total)
@@ -176,7 +202,8 @@ def frame(inner, slot_label, page, total, cover=False):
     )
     return (
         '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">'
-        '<style>' + CSS + '</style></head><body><div class="stage">'
+        '<style>' + CSS + '</style></head><body>'
+        '<div class="stage' + ((' v-' + variant) if variant else '') + '">'
         '<div class="bg"></div><div class="grid"></div><div class="vig"></div>'
         '<div class="frame">' + top + '<div class="body">' + inner + '</div>' + bot +
         '</div></div></body></html>'
