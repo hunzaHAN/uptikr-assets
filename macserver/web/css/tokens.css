@@ -1,0 +1,80 @@
+/* macserver — Spotify 스타일 디자인 토큰 */
+:root {
+  /* 배경 */
+  --bg-base: #000000;
+  --bg-panel: #121212;
+  --bg-elevated: #1f1f1f;
+  --bg-elevated-hover: #2a2a2a;
+  --bg-highlight: #282828;
+  --bg-press: #000000;
+  --bg-tinted: rgba(255,255,255,0.07);
+  --bg-tinted-hover: rgba(255,255,255,0.1);
+  --bg-tinted-active: rgba(255,255,255,0.14);
+  --bg-card: #181818;
+  --bg-card-hover: #282828;
+  --bg-input: #242424;
+  --bg-input-hover: #2a2a2a;
+  --bg-menu: #282828;
+  --bg-menu-hover: #3e3e3e;
+  --bg-toast: #2e77d0;
+
+  /* 텍스트 */
+  --text-base: #ffffff;
+  --text-subdued: #b3b3b3;
+  --text-muted: #727272;
+  --text-on-accent: #000000;
+
+  /* 브랜드 */
+  --accent: #1db954;
+  --accent-bright: #1ed760;
+  --accent-hover: #3be477;
+  --accent-press: #169c46;
+  --negative: #f15e6c;
+  --negative-bright: #ff6b6b;
+  --warning: #ffa42b;
+  --info: #509bf5;
+
+  /* 보더/구분선 */
+  --border: rgba(255,255,255,0.1);
+  --border-strong: #727272;
+  --divider: #282828;
+
+  /* 라운드 */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 16px;
+  --r-pill: 500px;
+
+  /* 간격 */
+  --gap-xs: 4px; --gap-sm: 8px; --gap-md: 16px; --gap-lg: 24px; --gap-xl: 32px;
+
+  /* 그림자 */
+  --shadow-card: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-menu: 0 16px 24px rgba(0,0,0,0.3), 0 6px 8px rgba(0,0,0,0.2);
+  --shadow-modal: 0 24px 48px rgba(0,0,0,0.6);
+
+  /* 타이포 */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "CircularSp", "Circular", "Apple SD Gothic Neo", "Pretendard Variable", "Pretendard", "Noto Sans KR", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
+  --fs-xs: 0.6875rem;  /* 11 */
+  --fs-sm: 0.75rem;    /* 12 */
+  --fs-base: 0.875rem; /* 14 */
+  --fs-md: 1rem;       /* 16 */
+  --fs-lg: 1.5rem;     /* 24 */
+  --fs-xl: 2rem;       /* 32 */
+  --fs-hero: 3rem;     /* 48 */
+
+  /* 레이아웃 */
+  --sidebar-w: 280px;
+  --topbar-h: 64px;
+  --statusbar-h: 80px;
+  --frame-gap: 8px;
+
+  /* 모션 */
+  --ease: cubic-bezier(0.3, 0, 0, 1);
+  --dur: 0.2s;
+  --dur-slow: 0.3s;
+
+  color-scheme: dark;
+}

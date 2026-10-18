@@ -1,0 +1,8 @@
+node_modules/
+dist/
+native/build/
+.DS_Store
+*.log
+test/.tmp/
+test/e2e/node_modules/
+test/e2e/.out/

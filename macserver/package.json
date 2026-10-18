@@ -1,0 +1,60 @@
+{
+  "name": "macserver",
+  "productName": "macserver",
+  "version": "0.1.0",
+  "description": "Mac 화면 원격 제어 + 폴더 서버 (Spotify 스타일 UI)",
+  "main": "electron/main.js",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "electron .",
+    "dev": "MACSERVER_DEV=1 electron .",
+    "server": "node server/cli.js",
+    "doctor": "node scripts/doctor.js",
+    "build:native": "bash scripts/build-native.sh",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --mac",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "mime-types": "^2.1.35",
+    "selfsigned": "^2.4.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.macserver.app",
+    "productName": "macserver",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "web/**/*",
+      "native/*.swift",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "native/build", "to": "native", "filter": ["**/*"] }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }, { "target": "zip", "arch": ["arm64", "x64"] }],
+      "icon": "build/icon.png",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "macserver는 마이크를 사용하지 않습니다.",
+        "NSCameraUsageDescription": "macserver는 카메라를 사용하지 않습니다.",
+        "LSApplicationCategoryType": "public.app-category.utilities"
+      }
+    }
+  }
+}
