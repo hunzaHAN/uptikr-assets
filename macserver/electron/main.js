@@ -150,6 +150,9 @@ function buildNative() {
 
 async function restartServer() { if (!server) return; await server.restart(); }
 
+function loginAtStart() { try { return app.getLoginItemSettings().openAtLogin; } catch (_) { return false; } }
+function setLoginAtStart(on) { try { app.setLoginItemSettings({ openAtLogin: !!on, openAsHidden: true }); } catch (_) {} refreshTrayMenu(); }
+
 // ---------- 스모크 테스트 (CI/헤드리스 검증) ----------
 async function runSmoke() {
   const out = { urls: server.urls(), native: nativeInput.status() };
@@ -194,6 +197,7 @@ function refreshTrayMenu() {
     { label: '접속 주소', submenu: [{ label: u.local, click: () => clipboard.writeText(u.local) }, ...u.lan.map((l) => ({ label: l, click: () => clipboard.writeText(l) })), { type: 'separator' }, { label: '(클릭하면 복사)', enabled: false }] },
     { type: 'separator' },
     { label: agentWin ? '화면 에이전트 다시 시작' : '화면 에이전트 시작', click: () => restartAgent() },
+    { label: '로그인 시 자동 실행', type: 'checkbox', checked: loginAtStart(), click: (mi) => setLoginAtStart(mi.checked) },
     { label: 'macOS 권한 설정…', submenu: [{ label: '화면 기록', click: () => systemAction('open-privacy', { kind: 'screen' }) }, { label: '손쉬운 사용', click: () => systemAction('open-privacy', { kind: 'accessibility' }) }] },
     { type: 'separator' },
     { label: 'macserver 종료', click: () => { quitting = true; app.quit(); } },
