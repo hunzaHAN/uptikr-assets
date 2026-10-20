@@ -58,6 +58,30 @@ test('setup → login → accounts → shares → files', async (t) => {
     assert.equal((await bob.put(`/api/files/upload?share=${shareId}&path=x.txt`, Buffer.from('x'))).status, 403);
     const zip = await bob.get(`/api/files/download?share=${shareId}&path=sub`); assert.equal(zip.status, 200); assert.equal(zip.headers.get('content-type'), 'application/zip'); assert.ok(zip.data.byteLength > 20);
   });
+  await t.test('inline download: html/svg forced to attachment (anti-XSS), pdf/png stay inline', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    await api.put(`/api/files/upload?share=${shareId}&path=evil.html`, Buffer.from('<script>fetch("//x")</script>'));
+    await api.put(`/api/files/upload?share=${shareId}&path=pic.svg`, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>'));
+    await api.put(`/api/files/upload?share=${shareId}&path=doc.pdf`, Buffer.from('%PDF-1.4 test'));
+    await api.put(`/api/files/upload?share=${shareId}&path=pic.png`, png);
+    try {
+      const html = await api.get(`/api/files/download?share=${shareId}&path=evil.html&inline=1`);
+      assert.match(html.headers.get('content-disposition'), /attachment/, 'html inline → attachment');
+      assert.match(html.headers.get('content-security-policy') || '', /sandbox/, 'html has CSP sandbox');
+      const svg = await api.get(`/api/files/download?share=${shareId}&path=pic.svg&inline=1`);
+      assert.match(svg.headers.get('content-disposition'), /attachment/, 'svg inline → attachment');
+      // PDF/PNG inline 미리보기는 그대로 (CSP sandbox 없음 → 렌더 가능)
+      const pdf = await api.get(`/api/files/download?share=${shareId}&path=doc.pdf&inline=1`);
+      assert.match(pdf.headers.get('content-disposition'), /inline/, 'pdf stays inline');
+      assert.equal(pdf.headers.get('content-security-policy'), null, 'pdf has no sandbox CSP');
+      const img = await api.get(`/api/files/download?share=${shareId}&path=pic.png&inline=1`);
+      assert.match(img.headers.get('content-disposition'), /inline/, 'png stays inline');
+      assert.equal(img.headers.get('content-type'), 'image/png', 'png served as image/png');
+    } finally {
+      await api.post('/api/files/delete', { share: shareId, paths: ['evil.html', 'pic.svg', 'doc.pdf', 'pic.png'] });
+    }
+  });
+
   await t.test('path traversal is blocked', async () => {
     for (const p of ['../', '..%2F..%2Fetc%2Fpasswd', 'sub/../../x', '/etc/passwd', '%2e%2e/']) {
       const r = await bob.get(`/api/files/list?share=${shareId}&path=${p}`);

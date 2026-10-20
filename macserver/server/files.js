@@ -74,9 +74,13 @@ function filesRouter(ctx) {
       return;
     }
     const type = mime.lookup(name) || 'application/octet-stream';
-    const inline = req.query.inline === '1';
+    // 스크립트가 실행될 수 있는 타입(HTML/SVG/XML)은 inline 요청이어도 첨부로 내려 동일 출처 XSS/유출 방지
+    const scriptable = /(^text\/html)|(svg)|(xml)|(xhtml)/i.test(type);
+    const inline = req.query.inline === '1' && !scriptable;
     res.setHeader('Content-Disposition', contentDisposition(name, inline ? 'inline' : 'attachment'));
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    // 스크립트 실행 가능 타입만 샌드박스 CSP (첨부로도 내려감). PDF/이미지/미디어 inline 미리보기는 영향 없음
+    if (scriptable) res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
     if (!inline) audit.log('file.download', { user: req.account.username, share: share.name, path: rel, size: st.size });
     res.sendFile(abs, { headers: { 'Content-Type': type }, dotfiles: 'allow', acceptRanges: true, cacheControl: false, lastModified: true });
   }));
