@@ -5,4 +5,5 @@ native/build/
 *.log
 test/.tmp/
 test/e2e/node_modules/
+test/e2e/.out-mobile/
 test/e2e/.out/

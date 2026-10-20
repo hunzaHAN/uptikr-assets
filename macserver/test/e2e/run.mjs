@@ -62,20 +62,22 @@ try {
   assert((await host.textContent('.hero h1')).includes('훈자'), 'home greets admin');
   assert(await host.$('.lib-item'), 'library shows items');
 
-  // ---- 화면 세션 ----
-  step('screen session (viewer ⇄ agent over WebRTC)');
+  // ---- 화면 세션 (몰입/툴바/창모드) ----
+  step('screen session (immersive + toolbar + input)');
   await host.click('.nav-item:has-text("화면")');
   await host.waitForSelector('.stage');
   await shot(host, '04-screen-idle');
   await host.click('.stage .overlay button.btn.primary');
   await host.waitForFunction(() => { const v = document.querySelector('.stage video'); return v && v.videoWidth > 0; }, null, { timeout: 20000 });
   await host.waitForTimeout(1500);
+  // 접속하면 몰입 모드가 기본 (사이드바/상태바 숨김)
+  const immersive = await host.evaluate(() => document.getElementById('app').classList.contains('immersive-screen'));
+  assert(immersive, 'connects into immersive (fullscreen) mode by default');
+  assert(!(await host.isVisible('.sidebar')), 'sidebar hidden in immersive');
   await shot(host, '05-screen-live');
   const st = await host.evaluate(() => { const v = document.querySelector('.stage video'); return { w: v.videoWidth, h: v.videoHeight }; });
   assert(st.w === 1280 && st.h === 720, `video 1280x720 received (${st.w}x${st.h})`);
-  const sb = await host.textContent('.statusbar');
-  assert(sb.includes('제어 중') || sb.includes('보기'), 'statusbar shows session');
-  // 입력: 스테이지 클릭 → agent 로그
+  // 입력: 스테이지 클릭/휠/키 → agent 로그 (마우스 경로)
   const box = await host.$eval('.stage video', (v) => { const r = v.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
   await host.mouse.move(box.x, box.y); await host.mouse.down(); await host.mouse.up();
   await host.mouse.wheel(0, 120);
@@ -87,18 +89,26 @@ try {
   assert(logged.includes('key'), 'agent received key');
   const down = await agent.evaluate(() => window.__inputLog.find((e) => e.t === 'down'));
   assert(Math.abs(down.x - 0.5) < 0.05 && Math.abs(down.y - 0.5) < 0.05, `click normalized near center (${down.x.toFixed(2)}, ${down.y.toFixed(2)})`);
-  // 텍스트 보내기
-  await host.click('.side button:has-text("텍스트 보내기")');
+  // 끌어내는 툴바 → 텍스트 보내기
+  await host.click('.stage .tb-handle');
+  await host.waitForSelector('.stage.tb-open .vtoolbar');
+  await shot(host, '05b-toolbar');
+  await host.click('.vtoolbar .tb-btn[title="텍스트"]');
   await host.fill('.modal textarea', '안녕하세요');
   await host.click('.modal button.btn.primary');
   await host.waitForTimeout(300);
   const txt = await agent.evaluate(() => window.__inputLog.find((e) => e.t === 'text'));
-  assert(txt && txt.text === '안녕하세요', 'agent received unicode text');
-  // 화질 변경 / 상태 API
-  const status = await fetch(`${base}/api/admin/status`, { headers: { Authorization: 'Bearer ' + srv.auth.listSessions()[0] ? '' : '' } }).catch(() => null);
+  assert(txt && txt.text === '안녕하세요', 'agent received unicode text via toolbar');
   const hubSessions = srv.hub.statusSnapshot().sessions;
   assert(hubSessions.length === 1 && hubSessions[0].state === 'connected', 'hub reports connected session');
-  // 홈으로 가도 세션 유지 (상태바)
+  // 창 모드로 전환 → 사이드바/사이드 패널 복귀
+  await host.click('.stage .tb-handle');
+  await host.click('.vtoolbar .tb-btn[title="창 모드(작게)"]');
+  await host.waitForTimeout(300);
+  assert(await host.isVisible('.sidebar'), 'window mode restores sidebar');
+  assert(await host.isVisible('.viewer.windowed .side'), 'window mode shows side panel');
+  await shot(host, '05c-window-mode');
+  // 창 모드에선 사이드바로 이동 가능 → 세션 유지
   await host.click('.nav-item:has-text("홈")');
   await host.waitForTimeout(400);
   assert((await host.textContent('.statusbar')).includes('화면'), 'session persists across navigation');

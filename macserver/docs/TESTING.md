@@ -18,9 +18,15 @@ cd test/e2e && npm install        # playwright-core (최초 1회)
 cd ../.. && node test/e2e/run.mjs # 스크린샷 → test/e2e/.out/
 ```
 
+모바일(터치) 흐름 — 탭=클릭, 화면 키보드 입력, 몰입/창모드 전환:
+```bash
+node test/e2e/mobile.mjs      # 스크린샷 → test/e2e/.out-mobile/
+```
+
 컨테이너/서버 등 디스플레이가 없는 환경에서는 사전 설치된 Chromium 경로를 지정:
 ```bash
 CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome node test/e2e/run.mjs
+CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome node test/e2e/mobile.mjs
 ```
 
 검증 항목: 설정 마법사 → 홈 → 화면 세션(1280×720 수신, 마우스/휠/키/한글 텍스트가 에이전트에 도달, 좌표 정규화) → 세션 유지/종료 → 파일 목록/업로드/미리보기/폴더 생성/탐색/그리드 → 검색 → 계정 생성 → 설정 → 게스트 로그인(권한 제한 확인).
