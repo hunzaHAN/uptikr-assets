@@ -116,7 +116,8 @@ claude          # 첫 로그인 (브라우저 승인 1회) → 이후 재부팅�
 
 | macserver 위치 | 명령 |
 |---|---|
-| 예전 맥에만 있음 | `OLD_MAC_HOST=예전맥이름.local bash ~/setup.sh fetch` → 예전 맥에서 후보 폴더를 찾아 번호로 고르면 그 폴더만 복사 후 바로 등록 |
+| **지금 메인(예전) 맥 앞에 있음** | 메인 맥 터미널에서 `bash ~/setup.sh push` → 이 맥에서 폴더를 찾아 새 맥(`macserver.local`)으로 복사하고, 이어서 새 맥에서 등록까지 실행 |
+| 예전 맥에만 있음 (새 맥에서 작업 중) | `OLD_MAC_HOST=예전맥이름.local bash ~/setup.sh fetch` → 예전 맥에서 후보 폴더를 찾아 번호로 고르면 그 폴더만 복사 후 바로 등록 |
 | GitHub (공개/비공개) | `MACSERVER_GIT_URL=https://github.com/계정/저장소 bash ~/setup.sh macserver` → 비공개면 GitHub 로그인 창이 한 번 뜸 |
 | USB/드라이브/다운로드 폴더 | 폴더를 홈으로 옮긴 뒤 `MACSERVER_DIR=/경로 bash ~/setup.sh macserver` (경로는 Finder에서 드래그) |
 | 이 맥 어딘가에 있는데 못 찾음 | `bash ~/setup.sh find` 로 후보 확인 |

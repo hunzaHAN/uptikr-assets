@@ -7,7 +7,8 @@
 #    bash setup.sh              # 전체 세팅 (처음 1회, 다시 실행해도 안전함)
 #    bash setup.sh migrate      # 예전 맥미니 홈 폴더를 rsync로 가져오기 (--dry-run 가능)
 #    bash setup.sh verify       # 세팅 상태 점검표
-#    bash setup.sh fetch        # 예전 맥에서 macserver 폴더만 가져와 바로 등록 (OLD_MAC_HOST=, OLD_MAC_PATH= 선택)
+#    bash setup.sh push         # ★ 메인(예전) 맥에서 실행: macserver 폴더를 새 맥으로 보내고 새 맥에서 등록까지
+#    bash setup.sh fetch        # 새 맥에서 실행: 예전 맥에서 macserver 폴더만 가져와 바로 등록
 #    bash setup.sh find         # 이 맥에서 macserver 폴더 후보 찾기
 #    bash setup.sh macserver    # macserver 서비스만 (재)등록  (MACSERVER_DIR=/경로 로 직접 지정 가능)
 #    bash setup.sh status|logs|restart|stop|start   # macserver 운영
@@ -171,7 +172,31 @@ restore_brewfile() {
 }
 
 # setup 흐름 안에서 예전 맥 파일 가져오기 (주소를 비우면 건너뜀)
-maybe_migrate() {
+maybe_# 메인(예전) 맥에서 실행: 이 맥의 macserver 폴더를 새 맥으로 복사하고, 새 맥에서 서비스 등록까지 실행
+push_macserver() {
+  step "이 맥의 macserver → 새 맥으로 보내고 등록"
+  local dir name target nuser self
+  dir="$(find_macserver_dir)"
+  if [[ -z "$dir" || ! -d "$dir" ]]; then
+    dir="$(ask "  macserver 폴더 경로 (Finder 에서 드래그): " "")"; dir="${dir/#\~/$HOME}"; dir="${dir%/}"
+  fi
+  [[ -d "$dir" ]] || die "폴더가 없습니다: $dir"
+  name="$(basename "$dir")"
+  target="${NEW_MAC_HOST:-}"; [[ -n "$target" ]] || target="$(ask "  새 맥 주소 [macserver.local] (Tailscale 이면 macserver): " macserver.local)"
+  nuser="${NEW_MAC_USER:-$USER}"; nuser="$(ask "  새 맥 사용자 이름 [$nuser]: " "$nuser")"
+  ensure_old_mac_ssh "$nuser" "$target"
+  echo "  $dir/  →  $nuser@$target:~/$name/   (node_modules, .venv 는 새 맥에서 다시 설치)"
+  rsync -avh --progress --partial --exclude='.DS_Store' --exclude='node_modules' --exclude='.venv' --exclude='__pycache__' \
+    -e ssh "$dir/" "$nuser@$target:~/$name/" || die "복사 실패"
+  ok "복사 완료 → $nuser@$target:~/$name"
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  scp -q "$self" "$nuser@$target:~/setup.sh" && ok "setup.sh 도 새 맥에 복사"
+  echo
+  echo "  이제 새 맥에서 등록을 시작합니다. (새 맥의 비밀번호 1회 → 감지 결과 확인 Enter)"
+  ssh -t "$nuser@$target" "MACSERVER_DIR=\"\$HOME/$name\" bash ~/setup.sh macserver"
+}
+
+migrate() {
   [[ "${ASSUME_YES:-0}" == 1 && -z "$OLD_MAC_HOST" ]] && return 0
   step "예전 맥미니에서 파일 가져오기 (선택)"
   if [[ -z "$OLD_MAC_HOST" ]]; then
@@ -567,8 +592,8 @@ ensure_old_mac_ssh() {
   mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
   [[ -f "$HOME/.ssh/id_ed25519" ]] || ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" >/dev/null
   if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$u@$h" true 2>/dev/null; then
-    echo "  예전 맥 '$u' 비밀번호를 1회 입력하면 이후엔 키로 접속합니다. (팝업: Terminal의 로컬 네트워크 접근 → 허용)"
-    ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "$u@$h" </dev/tty || die "SSH 접속 실패: $u@$h  (예전 맥: 시스템 설정 > 일반 > 공유 > 원격 로그인 켜기)"
+    echo "  '$u@$h' 비밀번호를 1회 입력하면 이후엔 키로 접속합니다. (팝업: Terminal의 로컬 네트워크 접근 → 허용)"
+    ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "$u@$h" </dev/tty || die "SSH 접속 실패: $u@$h  (상대 맥: 시스템 설정 > 일반 > 공유 > 원격 로그인 켜기)"
   fi
 }
 
@@ -680,12 +705,13 @@ main() {
       summary ;;
     migrate)   start_log; preflight; migrate "$@" ;;
     fetch)     start_log; preflight; need_sudo; fetch_macserver ;;
+    push)      [[ "$(uname -s)" == Darwin ]] || die "macOS 전용"; push_macserver ;;
     verify)    start_log; need_sudo; verify ;;
     macserver) start_log; preflight; need_sudo; install_macserver; expose_macserver ;;
     find)      echo "macserver 후보 폴더 (Spotlight + find):"; list_macserver_candidates | sed 's/^/  /'; echo "등록:  MACSERVER_DIR=/경로 bash ~/setup.sh macserver" ;;
     status)    macserver_status ;;
     start|stop|restart|logs) macserver_ctl "$cmd" ;;
-    *) sed -n '2,22p' "$0"; exit 1 ;;
+    *) sed -n '2,23p' "$0"; exit 1 ;;
   esac
 }
 main "$@"
