@@ -7,7 +7,8 @@
 #    bash setup.sh              # 전체 세팅 (처음 1회, 다시 실행해도 안전함)
 #    bash setup.sh migrate      # 예전 맥미니 홈 폴더를 rsync로 가져오기 (--dry-run 가능)
 #    bash setup.sh verify       # 세팅 상태 점검표
-#    bash setup.sh macserver    # macserver 서비스만 (재)등록
+#    bash setup.sh find         # macserver 폴더 후보 찾기
+#    bash setup.sh macserver    # macserver 서비스만 (재)등록  (MACSERVER_DIR=/경로 로 직접 지정 가능)
 #    bash setup.sh status|logs|restart|stop|start   # macserver 운영
 #
 #  사람이 손댈 순간은 이것뿐:
@@ -385,17 +386,41 @@ macserver_domain() { if [[ "$MACSERVER_SCOPE" == daemon ]]; then echo system; el
 macserver_plist()  { if [[ "$MACSERVER_SCOPE" == daemon ]]; then echo "/Library/LaunchDaemons/$MACSERVER_LABEL.plist"; else echo "$HOME/Library/LaunchAgents/$MACSERVER_LABEL.plist"; fi; }
 
 # ---- macserver 자동 감지: 폴더 / 시작 명령 / 설치 명령 / 포트
-has_marker() { local d="$1"; [[ -f "$d/package.json" || -f "$d/requirements.txt" || -f "$d/pyproject.toml" || -f "$d/go.mod" || -f "$d/Cargo.toml" || -f "$d/Package.swift" ]] || ls -d "$d"/*.xcodeproj "$d"/*.app >/dev/null 2>&1; }
+has_marker() {
+  local d="$1"
+  [[ -f "$d/package.json" || -f "$d/requirements.txt" || -f "$d/pyproject.toml" || -f "$d/go.mod" || -f "$d/Cargo.toml" \
+     || -f "$d/Package.swift" || -f "$d/Makefile" || -f "$d/Dockerfile" || -f "$d/docker-compose.yml" || -d "$d/.git" ]] \
+  || ls -d "$d"/*.xcodeproj "$d"/*.app "$d"/*.sh >/dev/null 2>&1
+}
+
+# 이름에 macserver / mac-server / mac_server 가 들어간 폴더를 Spotlight + find 로 전부 수집 (홈, 외장 디스크 포함)
+list_macserver_candidates() {
+  local c out=""
+  while IFS= read -r c; do [[ -n "$c" && -d "$c" ]] && out+="$c"$'\n'; done < <(
+    mdfind "kMDItemContentType == 'public.folder' && (kMDItemFSName == '*macserver*'c || kMDItemFSName == '*mac-server*'c || kMDItemFSName == '*mac_server*'c)" 2>/dev/null
+    find "$HOME" /Volumes /opt /usr/local -maxdepth 5 -type d \( -iname '*macserver*' -o -iname '*mac-server*' -o -iname '*mac_server*' \) \
+      -not -path '*/Library/*' -not -path '*/node_modules/*' -not -path '*/.*' -not -path '*/Backups.backupdb/*' 2>/dev/null
+  )
+  printf '%s' "$out" | grep -v '^$' | grep -v '/node_modules/' | sort -u
+}
 
 find_macserver_dir() {
   [[ -d "$MACSERVER_DIR" ]] && { echo "$MACSERVER_DIR"; return; }
-  local c best="" list=""
+  local c marked="" plain="" all=""
   while IFS= read -r c; do
     [[ -n "$c" ]] || continue
-    if has_marker "$c"; then list+="$c"$'\n'; [[ -z "$best" ]] && best="$c"; fi
-  done < <(find "$HOME" -maxdepth 4 -type d -iname '*macserver*' -not -path '*/Library/*' -not -path '*/node_modules/*' -not -path '*/.*' 2>/dev/null | sort)
-  [[ -n "$list" ]] && printf '%s' "$list" >&2
-  echo "$best"
+    if has_marker "$c"; then marked+="$c"$'\n'; else plain+="$c"$'\n'; fi
+  done < <(list_macserver_candidates)
+  all="$(printf '%s%s' "$marked" "$plain" | grep -v '^$')"
+  [[ -n "$all" ]] || return 0
+  local n; n="$(printf '%s\n' "$all" | wc -l | tr -d ' ')"
+  if [[ "$n" -eq 1 && -n "$marked" ]]; then echo "$all"; return; fi
+  {
+    echo "  후보 폴더:"
+    local i=0; while IFS= read -r c; do i=$((i+1)); printf '   %2d) %s%s\n' "$i" "$c" "$( has_marker "$c" && echo '   ← 프로젝트 표식 있음' )"; done <<<"$all"
+  } >&2
+  local pick; pick="$(ask "  번호를 고르거나 경로를 직접 입력 [1]: " 1)"
+  if [[ "$pick" =~ ^[0-9]+$ ]]; then sed -n "${pick}p" <<<"$all"; else echo "${pick/#\~/$HOME}"; fi
 }
 
 infer_install_cmd() {
@@ -426,7 +451,13 @@ infer_start_cmd() {
   [[ -f "$d/Package.swift" ]] && { echo "swift run -c release"; return; }
   local app; app="$(ls -d "$d"/*.app "$d"/build/*.app 2>/dev/null | head -1)"
   [[ -n "$app" ]] && { echo "\"$app/Contents/MacOS/$(basename "$app" .app)\""; return; }
-  for f in macserver bin/macserver start.sh run.sh; do [[ -x "$d/$f" ]] && { echo "./$f"; return; }; done
+  for f in macserver bin/macserver start.sh run.sh serve.sh; do [[ -x "$d/$f" ]] && { echo "./$f"; return; }; done
+  if [[ -f "$d/Makefile" ]]; then
+    for t in run start serve; do grep -qE "^$t:" "$d/Makefile" && { echo "make $t"; return; }; done
+  fi
+  [[ -f "$d/docker-compose.yml" || -f "$d/compose.yml" ]] && command -v docker >/dev/null 2>&1 && { echo "docker compose up"; return; }
+  local shs; shs="$(ls "$d"/*.sh 2>/dev/null | wc -l | tr -d ' ')"
+  [[ "$shs" == 1 ]] && { echo "bash $(basename "$d"/*.sh)"; return; }
   echo ""
 }
 
@@ -444,10 +475,13 @@ detect_macserver() {
     if [[ -n "$MACSERVER_GIT_URL" ]]; then
       git clone "$MACSERVER_GIT_URL" "$MACSERVER_DIR" && dir="$MACSERVER_DIR" || { warn "clone 실패: $MACSERVER_GIT_URL"; return 1; }
     else
-      warn "홈 폴더에서 macserver 폴더를 못 찾았습니다."
+      warn "이 맥에서 macserver 폴더를 못 찾았습니다 (이름에 macserver/mac-server/mac_server 가 들어간 폴더 기준)."
+      echo "    - 아직 예전 맥에만 있다면:   OLD_MAC_HOST=예전맥.local bash ~/setup.sh migrate   후   bash ~/setup.sh macserver"
+      echo "    - GitHub 에 있다면:          MACSERVER_GIT_URL=https://github.com/... bash ~/setup.sh macserver"
+      echo "    - 이름이 다르다면 경로를 직접 입력 (Finder 에서 폴더를 터미널로 드래그하면 경로가 붙습니다)"
       dir="$(ask "  macserver 폴더 경로 (비우면 건너뜀): " "")"
-      [[ -n "$dir" && -d "${dir/#\~/$HOME}" ]] || { warn "건너뜀. 파일을 가져온 뒤:  bash setup.sh macserver"; return 1; }
-      dir="${dir/#\~/$HOME}"
+      dir="${dir/#\~/$HOME}"; dir="${dir%/}"
+      [[ -n "$dir" && -d "$dir" ]] || { warn "건너뜀. 나중에:  MACSERVER_DIR=/경로 bash ~/setup.sh macserver"; return 1; }
     fi
   fi
   inst="${MACSERVER_INSTALL_CMD:-$(infer_install_cmd "$dir")}"
@@ -597,9 +631,10 @@ main() {
     migrate)   start_log; preflight; migrate "$@" ;;
     verify)    start_log; need_sudo; verify ;;
     macserver) start_log; preflight; need_sudo; install_macserver; expose_macserver ;;
+    find)      echo "macserver 후보 폴더 (Spotlight + find):"; list_macserver_candidates | sed 's/^/  /'; echo "등록:  MACSERVER_DIR=/경로 bash ~/setup.sh macserver" ;;
     status)    macserver_status ;;
     start|stop|restart|logs) macserver_ctl "$cmd" ;;
-    *) sed -n '2,20p' "$0"; exit 1 ;;
+    *) sed -n '2,21p' "$0"; exit 1 ;;
   esac
 }
 main "$@"
