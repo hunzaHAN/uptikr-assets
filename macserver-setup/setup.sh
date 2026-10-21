@@ -7,7 +7,8 @@
 #    bash setup.sh              # 전체 세팅 (처음 1회, 다시 실행해도 안전함)
 #    bash setup.sh migrate      # 예전 맥미니 홈 폴더를 rsync로 가져오기 (--dry-run 가능)
 #    bash setup.sh verify       # 세팅 상태 점검표
-#    bash setup.sh find         # macserver 폴더 후보 찾기
+#    bash setup.sh fetch        # 예전 맥에서 macserver 폴더만 가져와 바로 등록 (OLD_MAC_HOST=, OLD_MAC_PATH= 선택)
+#    bash setup.sh find         # 이 맥에서 macserver 폴더 후보 찾기
 #    bash setup.sh macserver    # macserver 서비스만 (재)등록  (MACSERVER_DIR=/경로 로 직접 지정 가능)
 #    bash setup.sh status|logs|restart|stop|start   # macserver 운영
 #
@@ -467,13 +468,28 @@ infer_port() {
     | grep -oE '[Pp][Oo][Rr][Tt][^0-9]{0,15}[0-9]{4,5}' | grep -oE '[0-9]{4,5}$' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}'
 }
 
+# git clone; 비공개 GitHub 저장소면 gh 로 브라우저 로그인(클릭 1회) 후 재시도
+clone_macserver() {
+  local url="$1" dest="$2"
+  rm -rf "$dest.partial"
+  GIT_TERMINAL_PROMPT=0 git clone "$url" "$dest" 2>/dev/null && return 0
+  if [[ "$url" == *github.com* ]]; then
+    warn "비공개 저장소로 보입니다 → GitHub 로그인이 필요합니다 (브라우저에서 코드 입력/승인 1회)"
+    command -v gh >/dev/null 2>&1 || brew install gh || return 1
+    gh auth status >/dev/null 2>&1 || gh auth login --hostname github.com --git-protocol https --web </dev/tty || return 1
+    gh auth setup-git >/dev/null 2>&1 || true
+    rm -rf "$dest"; git clone "$url" "$dest" && return 0
+  fi
+  return 1
+}
+
 detect_macserver() {
   local dir inst start port a
   echo "  macserver 폴더를 찾는 중..."
   dir="$(find_macserver_dir 2>/dev/null)"
   if [[ -z "$dir" ]]; then
     if [[ -n "$MACSERVER_GIT_URL" ]]; then
-      git clone "$MACSERVER_GIT_URL" "$MACSERVER_DIR" && dir="$MACSERVER_DIR" || { warn "clone 실패: $MACSERVER_GIT_URL"; return 1; }
+      clone_macserver "$MACSERVER_GIT_URL" "$MACSERVER_DIR" && dir="$MACSERVER_DIR" || { warn "clone 실패: $MACSERVER_GIT_URL"; return 1; }
     else
       warn "이 맥에서 macserver 폴더를 못 찾았습니다 (이름에 macserver/mac-server/mac_server 가 들어간 폴더 기준)."
       echo "    - 아직 예전 맥에만 있다면:   OLD_MAC_HOST=예전맥.local bash ~/setup.sh migrate   후   bash ~/setup.sh macserver"
@@ -545,7 +561,46 @@ macserver_ctl() {
   [[ "$1" == logs ]] || macserver_status
 }
 
-# ------------------------------------------------------------------ migrate
+# ------------------------------------------------------------------ migrate / fetch
+ensure_old_mac_ssh() {
+  local u="$1" h="$2"
+  mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
+  [[ -f "$HOME/.ssh/id_ed25519" ]] || ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" >/dev/null
+  if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$u@$h" true 2>/dev/null; then
+    echo "  예전 맥 '$u' 비밀번호를 1회 입력하면 이후엔 키로 접속합니다. (팝업: Terminal의 로컬 네트워크 접근 → 허용)"
+    ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "$u@$h" </dev/tty || die "SSH 접속 실패: $u@$h  (예전 맥: 시스템 설정 > 일반 > 공유 > 원격 로그인 켜기)"
+  fi
+}
+
+# 예전 맥에서 macserver 폴더 하나만 가져와서 바로 등록
+fetch_macserver() {
+  step "예전 맥에서 macserver 폴더만 가져오기"
+  echo "  예전 맥에서 먼저: 시스템 설정 > 일반 > 공유 > '원격 로그인' 켜기 (1클릭)"
+  [[ -n "$OLD_MAC_HOST" ]] || OLD_MAC_HOST="$(ask "  예전 맥 주소 (예: old-mac.local / 192.168.0.10): " "")"
+  [[ -n "$OLD_MAC_HOST" ]] || die "주소가 필요합니다."
+  local u="$OLD_MAC_USER" h="$OLD_MAC_HOST" src="${OLD_MAC_PATH:-}" list n c i pick
+  ensure_old_mac_ssh "$u" "$h"
+  if [[ -z "$src" ]]; then
+    echo "  예전 맥에서 후보 폴더를 찾는 중..."
+    list="$(ssh "$u@$h" "find ~ /Volumes -maxdepth 5 -type d \( -iname '*macserver*' -o -iname '*mac-server*' -o -iname '*mac_server*' \) -not -path '*/Library/*' -not -path '*/node_modules/*' -not -path '*/.*' 2>/dev/null | sort")"
+    if [[ -n "$list" ]]; then
+      i=0; while IFS= read -r c; do i=$((i+1)); printf '   %2d) %s\n' "$i" "$c"; done <<<"$list"
+      pick="$(ask "  번호를 고르거나 예전 맥의 경로를 직접 입력 [1]: " 1)"
+      if [[ "$pick" =~ ^[0-9]+$ ]]; then src="$(sed -n "${pick}p" <<<"$list")"; else src="$pick"; fi
+    else
+      src="$(ask "  예전 맥에서 macserver 폴더 경로 (예: ~/Projects/macserver): " "")"
+    fi
+  fi
+  [[ -n "$src" ]] || die "경로가 필요합니다."
+  local dest="$HOME/$(basename "$src")"
+  local rsync_bin; rsync_bin="$(command -v rsync)"; [[ -x /opt/homebrew/bin/rsync ]] && rsync_bin=/opt/homebrew/bin/rsync
+  echo "  $u@$h:$src/  →  $dest/"
+  "$rsync_bin" -avh --progress --partial --exclude='.DS_Store' -e ssh "$u@$h:$src/" "$dest/" || die "복사 실패"
+  ok "복사 완료: $dest"
+  MACSERVER_DIR="$dest"
+  install_macserver; expose_macserver
+}
+
 migrate() {
   step "예전 맥미니 → 이 맥 홈 폴더 복사 (rsync, 다시 실행하면 이어서 복사)"
   echo "  예전 맥에서 먼저: 시스템 설정 > 일반 > 공유 > '원격 로그인' 켜기 (1클릭)"
@@ -553,12 +608,7 @@ migrate() {
   [[ -n "$OLD_MAC_HOST" ]] || die "주소가 필요합니다."
   local u="$OLD_MAC_USER" h="$OLD_MAC_HOST" dry=""
   [[ "${1:-}" == "--dry-run" ]] && dry="--dry-run"
-  mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
-  [[ -f "$HOME/.ssh/id_ed25519" ]] || ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" >/dev/null
-  if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$u@$h" true 2>/dev/null; then
-    echo "  예전 맥 '$u' 비밀번호를 1회 입력하면 이후엔 키로 접속합니다. (팝업: Terminal의 로컬 네트워크 접근 → 허용)"
-    ssh-copy-id -i "$HOME/.ssh/id_ed25519.pub" "$u@$h" </dev/tty || die "SSH 접속 실패: $u@$h"
-  fi
+  ensure_old_mac_ssh "$u" "$h"
   local rsync_bin; rsync_bin="$(command -v rsync)"; [[ -x /opt/homebrew/bin/rsync ]] && rsync_bin=/opt/homebrew/bin/rsync
   local ex=(
     --exclude='.Trash' --exclude='.DS_Store' --exclude='.Spotlight-V100' --exclude='.cache' --exclude='.npm/_cacache'
@@ -629,12 +679,13 @@ main() {
       install_tailscale; install_claude; install_macserver; expose_macserver
       summary ;;
     migrate)   start_log; preflight; migrate "$@" ;;
+    fetch)     start_log; preflight; need_sudo; fetch_macserver ;;
     verify)    start_log; need_sudo; verify ;;
     macserver) start_log; preflight; need_sudo; install_macserver; expose_macserver ;;
     find)      echo "macserver 후보 폴더 (Spotlight + find):"; list_macserver_candidates | sed 's/^/  /'; echo "등록:  MACSERVER_DIR=/경로 bash ~/setup.sh macserver" ;;
     status)    macserver_status ;;
     start|stop|restart|logs) macserver_ctl "$cmd" ;;
-    *) sed -n '2,21p' "$0"; exit 1 ;;
+    *) sed -n '2,22p' "$0"; exit 1 ;;
   esac
 }
 main "$@"
