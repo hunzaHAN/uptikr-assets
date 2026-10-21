@@ -11,9 +11,10 @@
 #    bash setup.sh status|logs|restart|stop|start   # macserver 운영
 #
 #  사람이 손댈 순간은 이것뿐:
-#    1) sudo 비밀번호 1회      2) "계속할까요?" Enter
-#    3) 자동로그인용 비밀번호 1회   4) Tailscale 로그인 URL 열고 '승인'
-#    5) (선택) 'claude' 첫 로그인
+#    1) sudo 비밀번호 1회          2) "계속할까요?" Enter
+#    3) 예전 맥 주소 (또는 Enter)   4) 자동로그인용 비밀번호 1회
+#    5) Tailscale 로그인 URL 열고 '승인'   6) macserver 감지 결과 확인 Enter
+#    7) (선택) 'claude' 첫 로그인
 # =============================================================================
 
 # ----------------------------- 설정 (필요하면 수정) ---------------------------
@@ -92,6 +93,7 @@ show_plan() {
 
 ${c_bold}이 스크립트가 할 일${c_reset}
   1. Xcode Command Line Tools / Rosetta 2 / Homebrew + 기본 패키지 ($BREW_FORMULAE)
+     (선택) 예전 맥미니 홈 폴더 가져오기 → 주소만 입력, 비우면 건너뜀
   2. 호스트명 '$SERVER_NAME', 시간대 $TIMEZONE
   3. 전원: 절대 잠들지 않기, 정전 복구 시 자동 재시작, 시스템 멈춤 시 자동 재시작, Wake-on-LAN
   4. 원격 접속: SSH(원격 로그인) + 화면 공유 켜기, 방화벽 켜기
@@ -100,8 +102,7 @@ ${c_bold}이 스크립트가 할 일${c_reset}
   7. Tailscale → 어디서든  ssh $USER@$SERVER_NAME , 화면 공유, HTTPS
   8. Claude Code 설치 (+ 로그인 시 tmux 안에서 claude remote-control 자동 실행)
   9. macserver 를 launchd 서비스로 등록 (부팅 시 자동 실행, 죽으면 10초 내 재시작, 로그 보관/로테이션)
-     - 위치: $MACSERVER_DIR
-     - 시작: ${MACSERVER_START_CMD:-(실행 중에 물어봄)}
+     - 위치/시작 명령/포트는 자동으로 찾아서 보여주고 Enter 로 확정 (${MACSERVER_START_CMD:-미지정이면 감지}) 
      - 노출: $expose_desc
   로그: $LOG
 EOF
@@ -142,7 +143,7 @@ install_brew() {
     NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
       || die "Homebrew 설치 실패"
   fi
-  grep -q 'brew shellenv' "$HOME/.zprofile" 2>/dev/null || printf '\neval "$(%s shellenv)"\n' "$BREW" >> "$HOME/.zprofile"
+  ensure_shell_profile
   eval "$("$BREW" shellenv)"
   ok "$(brew --version | head -1)"
 
@@ -151,11 +152,33 @@ install_brew() {
   brew install $BREW_FORMULAE || warn "일부 패키지 설치 실패 (로그 확인)"
   # shellcheck disable=SC2086
   [[ -n "$BREW_CASKS" ]] && { brew install --cask $BREW_CASKS || warn "일부 cask 설치 실패"; }
-  if [[ -f "$HOME/Brewfile" ]]; then
-    step "~/Brewfile 발견 → 예전 맥의 앱/패키지 복원"
-    brew bundle --file="$HOME/Brewfile" || warn "Brewfile 일부 실패 (나중에: brew bundle --file=~/Brewfile)"
-  fi
   return 0
+}
+
+# .zprofile 에 brew / claude 경로가 항상 있도록 (migrate 가 .zprofile 을 덮어써도 복구)
+ensure_shell_profile() {
+  grep -q 'brew shellenv' "$HOME/.zprofile" 2>/dev/null || printf '\neval "$(%s shellenv)"\n' "$BREW" >> "$HOME/.zprofile"
+  grep -q '.local/bin' "$HOME/.zprofile" 2>/dev/null || printf 'export PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.zprofile"
+}
+
+restore_brewfile() {
+  [[ -f "$HOME/Brewfile" ]] || return 0
+  step "~/Brewfile 발견 → 예전 맥의 앱/패키지 복원"
+  brew bundle --file="$HOME/Brewfile" || warn "Brewfile 일부 실패 (나중에: brew bundle --file=~/Brewfile)"
+  return 0
+}
+
+# setup 흐름 안에서 예전 맥 파일 가져오기 (주소를 비우면 건너뜀)
+maybe_migrate() {
+  [[ "${ASSUME_YES:-0}" == 1 && -z "$OLD_MAC_HOST" ]] && return 0
+  step "예전 맥미니에서 파일 가져오기 (선택)"
+  if [[ -z "$OLD_MAC_HOST" ]]; then
+    echo "  마이그레이션 지원으로 이미 옮겼거나 나중에 할 거면 그냥 Enter."
+    OLD_MAC_HOST="$(ask "  예전 맥 주소 (예: old-mac.local / 192.168.0.10, 비우면 건너뜀): " "")"
+  fi
+  [[ -n "$OLD_MAC_HOST" ]] || { ok "건너뜀 (나중에: bash setup.sh migrate)"; return 0; }
+  migrate
+  ensure_shell_profile
 }
 
 # ------------------------------------------------------------------ 2~5. 시스템
@@ -338,7 +361,7 @@ install_claude() {
   if ! command -v claude >/dev/null 2>&1; then
     curl -fsSL https://claude.ai/install.sh | bash || { warn "Claude Code 설치 실패"; return 0; }
   fi
-  grep -q '.local/bin' "$HOME/.zprofile" 2>/dev/null || printf 'export PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.zprofile"
+  ensure_shell_profile
   ok "$(claude --version 2>/dev/null || echo 'claude 설치됨')"
   warn "처음 1회 로그인 필요: 터미널에서  claude  실행 → 브라우저 로그인"
   if [[ "$CLAUDE_REMOTE_CONTROL" == 1 ]]; then
@@ -361,21 +384,94 @@ save_env() {
 macserver_domain() { if [[ "$MACSERVER_SCOPE" == daemon ]]; then echo system; else echo "gui/$UID"; fi; }
 macserver_plist()  { if [[ "$MACSERVER_SCOPE" == daemon ]]; then echo "/Library/LaunchDaemons/$MACSERVER_LABEL.plist"; else echo "$HOME/Library/LaunchAgents/$MACSERVER_LABEL.plist"; fi; }
 
-install_macserver() {
-  step "macserver 서비스 등록"
-  if [[ -z "$MACSERVER_START_CMD" ]]; then
-    echo "  macserver 시작 명령이 설정되지 않았습니다. (예: npm start  /  ./macserver --port 8080  /  python3 server.py)"
-    MACSERVER_START_CMD="$(ask "  시작 명령 (비워두면 건너뜀): " "")"
-    [[ -n "$MACSERVER_START_CMD" ]] || { warn "건너뜀. 나중에:  MACSERVER_START_CMD='npm start' bash setup.sh macserver"; return 0; }
+# ---- macserver 자동 감지: 폴더 / 시작 명령 / 설치 명령 / 포트
+has_marker() { local d="$1"; [[ -f "$d/package.json" || -f "$d/requirements.txt" || -f "$d/pyproject.toml" || -f "$d/go.mod" || -f "$d/Cargo.toml" || -f "$d/Package.swift" ]] || ls -d "$d"/*.xcodeproj "$d"/*.app >/dev/null 2>&1; }
+
+find_macserver_dir() {
+  [[ -d "$MACSERVER_DIR" ]] && { echo "$MACSERVER_DIR"; return; }
+  local c best="" list=""
+  while IFS= read -r c; do
+    [[ -n "$c" ]] || continue
+    if has_marker "$c"; then list+="$c"$'\n'; [[ -z "$best" ]] && best="$c"; fi
+  done < <(find "$HOME" -maxdepth 4 -type d -iname '*macserver*' -not -path '*/Library/*' -not -path '*/node_modules/*' -not -path '*/.*' 2>/dev/null | sort)
+  [[ -n "$list" ]] && printf '%s' "$list" >&2
+  echo "$best"
+}
+
+infer_install_cmd() {
+  local d="$1"
+  if   [[ -f "$d/package-lock.json" ]]; then echo "npm ci"
+  elif [[ -f "$d/pnpm-lock.yaml" ]];   then echo "pnpm install"
+  elif [[ -f "$d/yarn.lock" ]];        then echo "yarn install"
+  elif [[ -f "$d/package.json" ]];     then echo "npm install"
+  elif [[ -f "$d/requirements.txt" ]]; then echo "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+  elif [[ -f "$d/go.mod" ]];           then echo "go build -o macserver ."
+  elif [[ -f "$d/Cargo.toml" ]];       then echo "cargo build --release"
+  elif [[ -f "$d/Package.swift" ]];    then echo "swift build -c release"
   fi
-  if [[ ! -d "$MACSERVER_DIR" ]]; then
+}
+
+infer_start_cmd() {
+  local d="$1" f py=python3
+  if [[ -f "$d/package.json" ]]; then
+    grep -qE '"start"[[:space:]]*:' "$d/package.json" && { echo "npm start"; return; }
+    grep -qE '"serve"[[:space:]]*:' "$d/package.json" && { echo "npm run serve"; return; }
+    grep -qE '"dev"[[:space:]]*:'   "$d/package.json" && { echo "npm run dev"; return; }
+    for f in server.js index.js app.js main.js dist/index.js; do [[ -f "$d/$f" ]] && { echo "node $f"; return; }; done
+  fi
+  [[ -f "$d/requirements.txt" ]] && py=".venv/bin/python"
+  for f in server.py app.py main.py run.py; do [[ -f "$d/$f" ]] && { echo "$py $f"; return; }; done
+  [[ -f "$d/go.mod" ]]        && { echo "./macserver"; return; }
+  [[ -f "$d/Cargo.toml" ]]    && { echo "./target/release/$(basename "$d")"; return; }
+  [[ -f "$d/Package.swift" ]] && { echo "swift run -c release"; return; }
+  local app; app="$(ls -d "$d"/*.app "$d"/build/*.app 2>/dev/null | head -1)"
+  [[ -n "$app" ]] && { echo "\"$app/Contents/MacOS/$(basename "$app" .app)\""; return; }
+  for f in macserver bin/macserver start.sh run.sh; do [[ -x "$d/$f" ]] && { echo "./$f"; return; }; done
+  echo ""
+}
+
+infer_port() {
+  local d="$1"
+  cat "$d"/.env "$d"/.env.* "$d"/*.js "$d"/*.ts "$d"/*.py "$d"/*.json "$d"/src/*.js "$d"/src/*.ts "$d"/src/*.py "$d"/*.go "$d"/*.swift 2>/dev/null \
+    | grep -oE '[Pp][Oo][Rr][Tt][^0-9]{0,15}[0-9]{4,5}' | grep -oE '[0-9]{4,5}$' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}'
+}
+
+detect_macserver() {
+  local dir inst start port a
+  echo "  macserver 폴더를 찾는 중..."
+  dir="$(find_macserver_dir 2>/dev/null)"
+  if [[ -z "$dir" ]]; then
     if [[ -n "$MACSERVER_GIT_URL" ]]; then
-      git clone "$MACSERVER_GIT_URL" "$MACSERVER_DIR" || { warn "clone 실패: $MACSERVER_GIT_URL"; return 0; }
+      git clone "$MACSERVER_GIT_URL" "$MACSERVER_DIR" && dir="$MACSERVER_DIR" || { warn "clone 실패: $MACSERVER_GIT_URL"; return 1; }
     else
-      warn "$MACSERVER_DIR 가 없습니다. 'bash setup.sh migrate'로 가져오거나 MACSERVER_GIT_URL 을 설정한 뒤  bash setup.sh macserver"
-      save_env; return 0
+      warn "홈 폴더에서 macserver 폴더를 못 찾았습니다."
+      dir="$(ask "  macserver 폴더 경로 (비우면 건너뜀): " "")"
+      [[ -n "$dir" && -d "${dir/#\~/$HOME}" ]] || { warn "건너뜀. 파일을 가져온 뒤:  bash setup.sh macserver"; return 1; }
+      dir="${dir/#\~/$HOME}"
     fi
   fi
+  inst="${MACSERVER_INSTALL_CMD:-$(infer_install_cmd "$dir")}"
+  start="${MACSERVER_START_CMD:-$(infer_start_cmd "$dir")}"
+  port="${MACSERVER_PORT:-$(infer_port "$dir")}"
+  printf '\n  %-10s %s\n' "폴더:" "$dir"
+  printf '  %-10s %s\n' "설치:"  "${inst:-(없음)}"
+  printf '  %-10s %s\n' "시작:"  "${start:-(못 찾음 → 입력 필요)}"
+  printf '  %-10s %s\n' "포트:"  "${port:-(없음)}"
+  if [[ "${ASSUME_YES:-0}" == 1 && -n "$start" ]]; then a=Y; else a="$(ask "  이대로 등록할까요? [Y/n] " Y)"; fi
+  if [[ ! "$a" =~ ^[Yy]$ || -z "$start" ]]; then
+    dir="$(ask "  폴더 [$dir]: " "$dir")"; dir="${dir/#\~/$HOME}"
+    inst="$(ask "  설치 명령 [${inst:-없음}] (없으면 '-'): " "${inst:--}")"; [[ "$inst" == "-" ]] && inst=""
+    start="$(ask "  시작 명령 [${start:-예: npm start}]: " "$start")"
+    port="$(ask "  포트 [${port:-없음}] (없으면 '-'): " "${port:--}")"; [[ "$port" == "-" ]] && port=""
+  fi
+  [[ -n "$start" ]] || { warn "시작 명령이 없어 건너뜀. 나중에:  MACSERVER_START_CMD='npm start' bash setup.sh macserver"; return 1; }
+  MACSERVER_DIR="$dir"; MACSERVER_INSTALL_CMD="$inst"; MACSERVER_START_CMD="$start"; MACSERVER_PORT="$port"
+  return 0
+}
+
+install_macserver() {
+  step "macserver 서비스 등록"
+  detect_macserver || { save_env; return 0; }
   if [[ -n "$MACSERVER_INSTALL_CMD" ]]; then
     ( cd "$MACSERVER_DIR" && /bin/zsh -lc "$MACSERVER_INSTALL_CMD" ) || warn "설치 명령 실패: $MACSERVER_INSTALL_CMD"
   fi
@@ -438,6 +534,7 @@ migrate() {
     --exclude='Library/Containers' --exclude='Library/Group Containers'       # 샌드박스 앱 데이터 (마이그레이션 지원이 담당)
     --exclude='Library/Mail' --exclude='Library/Messages' --exclude='Library/Keychains' --exclude='Library/Accounts'
     --exclude='Library/Biome' --exclude='Library/Metadata' --exclude='Library/Preferences/ByHost'
+    --exclude='Library/LaunchAgents'                                          # 예전 맥의 자동실행 항목은 가져오지 않음
   )
   echo "  $u@$h:~/  →  $HOME/   ($rsync_bin ${dry:-실제 복사})"
   # shellcheck disable=SC2086
@@ -493,7 +590,7 @@ main() {
   case "$cmd" in
     setup)
       start_log; preflight; show_plan; need_sudo
-      install_clt; install_rosetta; install_brew
+      install_clt; install_rosetta; install_brew; maybe_migrate; restore_brewfile
       set_identity; set_power; enable_ssh; enable_screen_sharing; enable_firewall; set_updates; set_autologin
       install_tailscale; install_claude; install_macserver; expose_macserver
       summary ;;

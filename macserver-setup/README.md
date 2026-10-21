@@ -3,6 +3,14 @@
 새 맥미니를 **항상 켜져 있고, 어디서든 접속·컨트롤되고, 정전 뒤에도 혼자 복구되는 서버**로 만드는 키트입니다.
 `setup.sh` 하나를 터미널에서 실행하면 아래가 전부 자동으로 됩니다. 사람이 하는 건 비밀번호 입력과 "확인" 클릭뿐입니다.
 
+## 지금 바로 (서버로 만들 맥의 터미널에 붙여넣기)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hunzaHAN/uptikr-assets/macserver-setup/macserver-setup/setup.sh -o ~/setup.sh && bash ~/setup.sh
+```
+
+그 뒤에는 화면이 묻는 것만 답하면 됩니다 (4번 표 참고). macserver 폴더·시작 명령·포트는 **자동으로 찾아서 보여주니 Enter 로 확정**하면 되고, 예전 맥 파일도 주소만 넣으면 같은 실행 안에서 가져옵니다.
+
 | 항목 | 자동 처리 내용 |
 |---|---|
 | 개발 도구 | Xcode Command Line Tools, Rosetta 2, Homebrew, git/tmux/rsync/jq/node/python |
@@ -55,9 +63,11 @@
 
 ---
 
-## 3. 설정값 정하기 (macserver 부분만 알려주면 됨)
+## 3. 설정값 (보통은 건드릴 게 없음)
 
-`setup.sh` 상단의 설정 블록을 고치거나, 실행할 때 환경변수로 넘깁니다. 꼭 필요한 건 **시작 명령** 하나입니다. 비워 두면 실행 중에 물어봅니다.
+macserver는 스크립트가 홈 폴더에서 `*macserver*` 이름의 프로젝트 폴더를 찾아 **설치 명령·시작 명령·포트를 추정해서 보여줍니다** (`package.json`의 start 스크립트, `server.py`, `.app` 번들, `.env`의 PORT 등). 맞으면 Enter, 아니면 `n` 을 누르고 고치면 됩니다.
+
+미리 못 박고 싶으면 `setup.sh` 상단 설정 블록을 고치거나 환경변수로 넘깁니다.
 
 ```bash
 export SERVER_NAME=macserver                 # 호스트명 = Tailscale 이름
@@ -85,9 +95,10 @@ bash ~/setup.sh
 | 1 | `Password:` | 맥 로그인 비밀번호 1회 (이후엔 다시 안 물음) |
 | 2 | 할 일 목록 + `계속할까요? [Y/n]` | Enter |
 | 3 | (CLT 팝업이 뜨는 경우만) "명령어 라인 개발자 도구" | **설치** 클릭. 보통은 팝업 없이 자동 설치됨 |
-| 4 | `'사용자' 로그인 비밀번호 (자동 로그인 등록용)` | 비밀번호 1회 (화면에 안 보임, 저장 안 됨) |
-| 5 | `https://login.tailscale.com/a/xxxx` | 아무 기기에서 열고 **Connect/승인** 클릭 |
-| 6 | (시작 명령을 안 정했을 때) `시작 명령:` | 예: `npm start` |
+| 4 | `예전 맥 주소 (비우면 건너뜀):` | 마이그레이션 지원으로 이미 옮겼으면 Enter. 아니면 `예전맥이름.local` 입력 → 예전 맥 비밀번호 1회 |
+| 5 | `'사용자' 로그인 비밀번호 (자동 로그인 등록용)` | 비밀번호 1회 (화면에 안 보임, 저장 안 됨) |
+| 6 | `https://login.tailscale.com/a/xxxx` | 아무 기기(폰도 됨)에서 열고 **Connect/승인** 클릭 |
+| 7 | macserver 감지 결과 (폴더/설치/시작/포트) + `이대로 등록할까요? [Y/n]` | 맞으면 Enter. 틀리면 `n` 후 고치기 |
 | 끝 | 완료 요약 + 다음 할 일 | — |
 
 실행 시간은 보통 10~20분 (CLT·Homebrew 다운로드가 대부분). 중간에 끊겨도 **다시 실행하면 이미 된 건 건너뜁니다.**
@@ -101,7 +112,7 @@ claude          # 첫 로그인 (브라우저 승인 1회) → 이후 재부팅�
 
 ## 5. 예전 맥미니 파일 가져오기 (1번에서 마이그레이션 지원을 안 했을 때)
 
-예전 맥미니에서 **시스템 설정 > 일반 > 공유 > 원격 로그인** 켜기 (1클릭). 그리고 새 맥에서:
+4번 실행 중 "예전 맥 주소"에 주소를 넣으면 같은 실행 안에서 처리됩니다. 따로 하려면, 예전 맥미니에서 **시스템 설정 > 일반 > 공유 > 원격 로그인** 켜기 (1클릭) 후 새 맥에서:
 
 ```bash
 bash ~/setup.sh migrate --dry-run     # 뭐가 복사될지 먼저 보기
@@ -110,7 +121,7 @@ bash ~/setup.sh                       # 가져온 ~/Brewfile 로 앱/패키지 �
 ```
 
 - 주소는 `예전맥이름.local`, IP, 또는 예전 맥에도 Tailscale이 있으면 그 이름.
-- 홈 폴더 전체를 복사하되 캐시·휴지통·iCloud(다시 동기화됨)·샌드박스 앱 데이터·메일/메시지/키체인(마이그레이션 지원 전용)은 제외합니다. 필요하면 `setup.sh` 의 `ex=(...)` 목록을 수정하세요.
+- 홈 폴더 전체를 복사하되 캐시·휴지통·iCloud(다시 동기화됨)·샌드박스 앱 데이터·메일/메시지/키체인(마이그레이션 지원 전용)·예전 자동실행 항목(LaunchAgents)은 제외합니다. 필요하면 `setup.sh` 의 `ex=(...)` 목록을 수정하세요.
 - `/Applications` 의 앱은 rsync로 옮기지 않습니다. Homebrew로 깐 앱은 Brewfile로 자동 복원되고, 나머지는 마이그레이션 지원이나 재설치가 안전합니다.
 
 | | 마이그레이션 지원 (1번) | `setup.sh migrate` |
@@ -168,7 +179,8 @@ sudo softwareupdate -ia --restart   # OS 업데이트는 내가 원할 때
 - **"화면 공유/원격 로그인이 안 켜졌다"** 경고가 뜨면: 시스템 설정 > 일반 > 공유 에서 해당 토글 1클릭. 최신 macOS는 일부를 GUI에서만 허용합니다.
 - **"Terminal이 로컬 네트워크의 기기를 찾으려고 합니다"** 팝업 (macOS 15+): 허용. `migrate` 로 `.local` 주소에 붙을 때 뜹니다.
 - **자동 로그인이 건너뛰어졌다**: FileVault가 켜져 있는 겁니다. `sudo fdesetup disable` 후 복호화가 끝나면 `bash ~/setup.sh` 재실행.
-- **Tailscale**: 이 키트는 Homebrew의 오픈소스 `tailscaled` 를 시스템 데몬으로 깝니다 (로그인 전에도 올라오고 Tailscale SSH 지원). App Store의 Tailscale 앱을 **추가로 깔지 마세요** (충돌).
+- **Tailscale**: 이 키트는 Homebrew의 오픈소스 `tailscaled` 를 시스템 데몬으로 깝니다 (로그인 전에도 올라오고 Tailscale SSH 지원). 메뉴 막대 아이콘은 없고 상태는 `tailscale status` 로 봅니다. App Store의 Tailscale 앱을 **추가로 깔지 마세요** (충돌).
+- **지금 원격(SSH/화면 공유)으로 접속해서 실행 중이라면**: 호스트명 변경·방화벽·Tailscale 설치 중에도 기존 접속은 끊기지 않습니다. SSH로만 붙어 있으면 macserver 서비스는 "GUI 세션이 없어 못 띄움" 경고와 함께 다음 로그인(재부팅 시 자동 로그인) 때 뜹니다. 끝나고 `sudo reboot` 한 번이 가장 확실합니다.
 - **funnel 실패**: 처음엔 Tailscale 관리콘솔에서 Funnel 허용이 필요합니다. 명령이 안내 URL을 출력합니다.
 - **macserver가 계속 재시작**: `bash ~/setup.sh logs` 로 stderr 확인. 시작 명령이 PATH 문제면 절대경로로 (`/opt/homebrew/bin/node server.js`).
 - **모니터 없이 화면 공유가 느리다**: HDMI 더미 플러그.
