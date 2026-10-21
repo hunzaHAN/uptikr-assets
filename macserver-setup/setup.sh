@@ -172,31 +172,7 @@ restore_brewfile() {
 }
 
 # setup 흐름 안에서 예전 맥 파일 가져오기 (주소를 비우면 건너뜀)
-maybe_# 메인(예전) 맥에서 실행: 이 맥의 macserver 폴더를 새 맥으로 복사하고, 새 맥에서 서비스 등록까지 실행
-push_macserver() {
-  step "이 맥의 macserver → 새 맥으로 보내고 등록"
-  local dir name target nuser self
-  dir="$(find_macserver_dir)"
-  if [[ -z "$dir" || ! -d "$dir" ]]; then
-    dir="$(ask "  macserver 폴더 경로 (Finder 에서 드래그): " "")"; dir="${dir/#\~/$HOME}"; dir="${dir%/}"
-  fi
-  [[ -d "$dir" ]] || die "폴더가 없습니다: $dir"
-  name="$(basename "$dir")"
-  target="${NEW_MAC_HOST:-}"; [[ -n "$target" ]] || target="$(ask "  새 맥 주소 [macserver.local] (Tailscale 이면 macserver): " macserver.local)"
-  nuser="${NEW_MAC_USER:-$USER}"; nuser="$(ask "  새 맥 사용자 이름 [$nuser]: " "$nuser")"
-  ensure_old_mac_ssh "$nuser" "$target"
-  echo "  $dir/  →  $nuser@$target:~/$name/   (node_modules, .venv 는 새 맥에서 다시 설치)"
-  rsync -avh --progress --partial --exclude='.DS_Store' --exclude='node_modules' --exclude='.venv' --exclude='__pycache__' \
-    -e ssh "$dir/" "$nuser@$target:~/$name/" || die "복사 실패"
-  ok "복사 완료 → $nuser@$target:~/$name"
-  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-  scp -q "$self" "$nuser@$target:~/setup.sh" && ok "setup.sh 도 새 맥에 복사"
-  echo
-  echo "  이제 새 맥에서 등록을 시작합니다. (새 맥의 비밀번호 1회 → 감지 결과 확인 Enter)"
-  ssh -t "$nuser@$target" "MACSERVER_DIR=\"\$HOME/$name\" bash ~/setup.sh macserver"
-}
-
-migrate() {
+maybe_migrate() {
   [[ "${ASSUME_YES:-0}" == 1 && -z "$OLD_MAC_HOST" ]] && return 0
   step "예전 맥미니에서 파일 가져오기 (선택)"
   if [[ -z "$OLD_MAC_HOST" ]]; then
@@ -624,6 +600,30 @@ fetch_macserver() {
   ok "복사 완료: $dest"
   MACSERVER_DIR="$dest"
   install_macserver; expose_macserver
+}
+
+# 메인(예전) 맥에서 실행: 이 맥의 macserver 폴더를 새 맥으로 복사하고, 새 맥에서 서비스 등록까지 실행
+push_macserver() {
+  step "이 맥의 macserver → 새 맥으로 보내고 등록"
+  local dir name target nuser self
+  dir="$(find_macserver_dir)"
+  if [[ -z "$dir" || ! -d "$dir" ]]; then
+    dir="$(ask "  macserver 폴더 경로 (Finder 에서 드래그): " "")"; dir="${dir/#\~/$HOME}"; dir="${dir%/}"
+  fi
+  [[ -d "$dir" ]] || die "폴더가 없습니다: $dir"
+  name="$(basename "$dir")"
+  target="${NEW_MAC_HOST:-}"; [[ -n "$target" ]] || target="$(ask "  새 맥 주소 [macserver.local] (Tailscale 이면 macserver): " macserver.local)"
+  nuser="${NEW_MAC_USER:-$USER}"; nuser="$(ask "  새 맥 사용자 이름 [$nuser]: " "$nuser")"
+  ensure_old_mac_ssh "$nuser" "$target"
+  echo "  $dir/  →  $nuser@$target:~/$name/   (node_modules, .venv 는 새 맥에서 다시 설치)"
+  rsync -avh --progress --partial --exclude='.DS_Store' --exclude='node_modules' --exclude='.venv' --exclude='__pycache__' \
+    -e ssh "$dir/" "$nuser@$target:~/$name/" || die "복사 실패"
+  ok "복사 완료 → $nuser@$target:~/$name"
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  scp -q "$self" "$nuser@$target:~/setup.sh" && ok "setup.sh 도 새 맥에 복사"
+  echo
+  echo "  이제 새 맥에서 등록을 시작합니다. (새 맥의 비밀번호 1회 → 감지 결과 확인 Enter)"
+  ssh -t "$nuser@$target" "MACSERVER_DIR=\"\$HOME/$name\" bash ~/setup.sh macserver"
 }
 
 migrate() {
